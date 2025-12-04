@@ -84,6 +84,32 @@ variable "ingress_name" {
   default     = "app-ingress"
 }
 
+# Worker Configuration Variables
+variable "nginx_worker_processes" {
+  description = "Number of NGINX worker processes (auto = number of CPU cores)"
+  type        = string
+  default     = "auto"
+}
+
+variable "nginx_worker_connections" {
+  description = "Maximum number of simultaneous connections per worker"
+  type        = string
+  default     = "2048"
+}
+
+variable "nginx_worker_rlimit_nofile" {
+  description = "Maximum number of open files per worker process"
+  type        = string
+  default     = "65535"
+}
+
+# Stream Configuration Variables
+variable "enable_tcp_udp_balancing" {
+  description = "Enable TCP/UDP stream load balancing"
+  type        = bool
+  default     = false
+}
+
 # Logging Variables
 variable "enable_logging" {
   description = "Enable NGINX access logging"

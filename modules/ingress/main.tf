@@ -65,16 +65,27 @@ resource "helm_release" "nginx_ingress" {
           runAsNonRoot = true
           readOnlyRootFilesystem = true
         }
+        # Worker configuration
+        workerProcesses = var.nginx_worker_processes
+        workerRlimitNofile = var.nginx_worker_rlimit_nofile
         # Rate limiting and request handling
         config = {
-          "client-body-timeout"      = "600"
-          "client-header-timeout"    = "600"
-          "client-max-body-size"     = "20m"
+          "worker-processes"        = var.nginx_worker_processes
+          "worker-connections"      = var.nginx_worker_connections
+          "worker-rlimit-nofile"    = var.nginx_worker_rlimit_nofile
+          "client-body-timeout"     = "600"
+          "client-header-timeout"   = "600"
+          "client-max-body-size"    = "20m"
           "upstream-keepalive-timeout" = "60"
           "upstream-keepalive-requests" = "100"
-          "keep-alive"               = "75"
-          "keep-alive-requests"      = "100"
+          "keep-alive"              = "75"
+          "keep-alive-requests"     = "100"
         }
+        # Stream configuration for TCP/UDP load balancing
+        tcp = var.enable_tcp_udp_balancing ? {
+          "443" = "database/postgres-primary:5432"
+        } : {}
+        udp = var.enable_tcp_udp_balancing ? {} : {}
         # Logging configuration
         logs = {
           enabled = var.enable_logging
