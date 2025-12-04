@@ -201,3 +201,33 @@ variable "health_check_port" {
   type        = number
   default     = 13133
 }
+
+# Correlation ID and Trace Context Variables
+variable "enable_correlation_id_propagation" {
+  description = "Enable correlation ID propagation across services"
+  type        = bool
+  default     = true
+}
+
+variable "correlation_id_header_name" {
+  description = "HTTP header name for correlation ID"
+  type        = string
+  default     = "X-Correlation-ID"
+}
+
+variable "trace_context_format" {
+  description = "Trace context format (w3c, jaeger, b3, ottrace)"
+  type        = string
+  default     = "w3c"
+  
+  validation {
+    condition     = contains(["w3c", "jaeger", "b3", "ottrace"], var.trace_context_format)
+    error_message = "trace_context_format must be one of: w3c, jaeger, b3, ottrace"
+  }
+}
+
+variable "enable_baggage_propagation" {
+  description = "Enable OpenTelemetry Baggage propagation for cross-service context"
+  type        = bool
+  default     = true
+}

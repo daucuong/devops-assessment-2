@@ -10,8 +10,7 @@
 7. [Disaster Recovery](#disaster-recovery)
 8. [Observability](#observability)
 9. [Resource Tagging & Cost Management](#resource-tagging--cost-management)
-10. [Recent Improvements](#recent-improvements-latest-updates)
-11. [References](#references)
+10. [References](#references)
 
 ---
 
@@ -446,7 +445,10 @@ OpenTelemetry Collector:
 - User-defined dashboards for custom metrics
 - Alert integration with PagerDuty, Slack, etc.
 
-### Distributed Tracing
+### Distributed Tracing & Correlation ID
+
+**Overview**
+The platform supports distributed tracing across all .NET microservices using correlation IDs. Each request is assigned a unique identifier that propagates through the entire request chain, enabling end-to-end request tracing and debugging.
 
 **OpenTelemetry Collector**
 - Collects traces from instrumented applications
@@ -455,21 +457,717 @@ OpenTelemetry Collector:
   - OTLP HTTP (port 4318)
   - Jaeger (port 14250)
   - Other legacy protocols
+- Trace context format: **W3C Trace Context** (default; supports Jaeger, B3, OT Trace)
+- Resource detection: Kubernetes labels and cloud provider metadata
 
 **Jaeger** (Distributed Tracing)
 - Query UI: traces visualization & search
 - Backend storage: in-memory or Elasticsearch-backed
-- Sampling: 10% default (configurable)
+- Sampling: 10% default (configurable per environment)
+- Accessible at: `http://jaeger-query.observability:16686`
 
 **Grafana Tempo** (Trace Storage)
 - Long-term trace storage (alternative to Jaeger)
 - Storage backend: PersistentVolume (10Gi default)
 - Integrated with Grafana for trace visualization
+- Accessible at: `http://tempo.observability:3100`
+
+#### Correlation ID Configuration
+
+**Default Configuration:**
+- **HTTP Header:** `X-Correlation-ID`
+- **Format:** UUID v4 (e.g., `550e8400-e29b-41d4-a716-446655440000`)
+- **Propagation:** W3C Trace Context standard
+- **Baggage Support:** Enabled (cross-service context propagation)
+
+**Configurable Variables** (in `modules/observability/variables.tf`):
+```hcl
+variable "enable_correlation_id_propagation" {
+  default = true  # Enable/disable correlation ID support
+}
+
+variable "correlation_id_header_name" {
+  default = "X-Correlation-ID"  # Custom header name
+}
+
+variable "trace_context_format" {
+  default = "w3c"  # w3c, jaeger, b3, or ottrace
+}
+
+variable "enable_baggage_propagation" {
+  default = true  # Propagate context across services
+}
+```
+
+#### .NET Application Integration
+
+**.NET Instrumentation Setup Examples**
+
+1. **Install NuGet Packages:**
+```bash
+dotnet add package OpenTelemetry
+dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol
+dotnet add package OpenTelemetry.Instrumentation.AspNetCore
+dotnet add package OpenTelemetry.Instrumentation.Http
+dotnet add package OpenTelemetry.Extensions.Hosting
+dotnet add package System.Diagnostics.DiagnosticSource
+```
+
+2. **Configure in Program.cs** (ASP.NET Core):
+```csharp
+using OpenTelemetry.Trace;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Exporter;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Configure OpenTelemetry tracing
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => 
+        resource.AddService(
+            serviceName: "acme-api",
+            serviceVersion: "1.0.0"))
+    .WithTracing(tracing => 
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddEntityFrameworkCoreInstrumentation()
+            .AddOtlpExporter(opt =>
+            {
+                opt.Endpoint = new Uri(
+                    Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") 
+                    ?? "http://opentelemetry-collector.observability.svc:4317");
+                opt.Protocol = OtlpExportProtocol.Grpc;
+            }));
+
+var app = builder.Build();
+app.Run();
+```
+
+3. **Environment Variables** (Kubernetes Deployment):
+```yaml
+env:
+  - name: OTEL_EXPORTER_OTLP_ENDPOINT
+    value: "http://opentelemetry-collector.observability.svc:4317"
+  - name: OTEL_SERVICE_NAME
+    value: "acme-api"
+  - name: OTEL_TRACES_SAMPLER
+    value: "parentbased_always_on"
+  - name: OTEL_PROPAGATORS
+    value: "jaeger,baggage"
+```
+
+4. **Correlation ID Middleware** (.NET):
+```csharp
+// Add custom middleware to handle correlation IDs
+public class CorrelationIdMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<CorrelationIdMiddleware> _logger;
+
+    public CorrelationIdMiddleware(RequestDelegate next, 
+        ILogger<CorrelationIdMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        const string correlationIdHeader = "X-Correlation-ID";
+        
+        // Get or generate correlation ID
+        var correlationId = context.Request.Headers
+            .TryGetValue(correlationIdHeader, out var headerValue) 
+            ? headerValue.ToString() 
+            : System.Guid.NewGuid().ToString();
+        
+        // Store in HttpContext for application access
+        context.Items["CorrelationId"] = correlationId;
+        
+        // Add to response headers
+        context.Response.Headers.Add(correlationIdHeader, correlationId);
+        
+        // Add to logging scope
+        using (_logger.BeginScope(new Dictionary<string, object> 
+            { { "CorrelationId", correlationId } }))
+        {
+            _logger.LogInformation("Request started with correlation ID: {CorrelationId}", 
+                correlationId);
+            
+            await _next(context);
+            
+            _logger.LogInformation("Request completed with correlation ID: {CorrelationId}", 
+                correlationId);
+        }
+    }
+}
+
+// Register in Program.cs
+app.UseMiddleware<CorrelationIdMiddleware>();
+```
+
+#### Tracing Workflow
+
+```
+Client Request
+    │
+    ├─ Header: X-Correlation-ID: abc-123
+    │
+    ▼
+NGINX Ingress (TLS Termination)
+    │
+    ├─ Forward X-Correlation-ID header
+    │
+    ▼
+API Pod (acme-api)
+    │
+    ├─ CorrelationIdMiddleware extracts/generates ID
+    ├─ Stores in HttpContext.Items
+    ├─ Adds trace context to OpenTelemetry span
+    │
+    ▼
+Downstream Service Call (acme-worker, etc.)
+    │
+    ├─ HttpClient adds X-Correlation-ID header
+    ├─ OpenTelemetry adds W3C Trace-Parent header
+    │
+    ▼
+OpenTelemetry Collector
+    │
+    ├─ Receives traces from all services
+    ├─ Enriches with Kubernetes metadata
+    ├─ Applies sampling (10% default)
+    │
+    ├─ Export to Jaeger
+    │   └─ Real-time trace queries
+    │
+    └─ Export to Tempo
+        └─ Long-term storage & analysis
+
+Trace Lookup (Jaeger/Tempo UI)
+    │
+    ├─ Search by Correlation ID: abc-123
+    ├─ View full request chain across services
+    ├─ Analyze latency per service
+    └─ Identify errors and bottlenecks
+```
+
+#### Monitoring Correlation IDs
+
+**Sample Grafana Dashboard Queries:**
+
+```promql
+# Traces per correlation ID (Tempo)
+sum by (correlation_id) (
+  rate(tempo_distributor_trace_received_total[5m])
+)
+
+# Error rate by correlation ID
+sum by (correlation_id) (
+  rate(
+    tempo_distributor_trace_received_total
+    {span_status="error"}[5m]
+  )
+) / 
+sum by (correlation_id) (
+  rate(tempo_distributor_trace_received_total[5m])
+)
+
+# P95 latency by service
+histogram_quantile(0.95, 
+  rate(
+    otel_rpc_server_duration_seconds_bucket[5m]
+  )
+)
+```
+
+#### Troubleshooting
+
+**Check if correlation ID is propagating:**
+```bash
+# View logs with correlation ID
+kubectl logs -n application <pod-name> | grep "X-Correlation-ID"
+
+# Port-forward to Jaeger and search
+kubectl port-forward -n observability svc/jaeger-query 16686:16686
+# Open http://localhost:16686 and search by trace ID
+```
+
+**Verify OTEL Collector is receiving traces:**
+```bash
+# Check collector logs
+kubectl logs -n observability -l app.kubernetes.io/name=opentelemetry-collector | grep received
+
+# Check for errors
+kubectl logs -n observability -l app.kubernetes.io/name=opentelemetry-collector | grep -i error
+```
+
+**Test correlation ID propagation locally:**
+```bash
+# Start a request with correlation ID header
+curl -H "X-Correlation-ID: test-123" http://localhost:8000/api/data
+```
 
 ### Health Checks
-- **Liveness Probe:** Pod restart on failure
-- **Readiness Probe:** Remove from load balancer if not ready
-- **Startup Probe:** Support for slow-starting applications
+
+The platform uses comprehensive health checks for .NET applications to monitor pod lifecycle and resource utilization. All services implement three probe types that work together to ensure only healthy pods receive traffic.
+
+#### .NET Health Check Implementation
+
+**1. Install AspNetCore.HealthChecks NuGet Package:**
+```bash
+dotnet add package AspNetCore.HealthChecks.UI
+dotnet add package AspNetCore.HealthChecks.SqlServer
+dotnet add package HealthChecks.ApplicationStatus
+```
+
+**2. Configure Health Checks in Program.cs:**
+```csharp
+using HealthChecks.UI.Client;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add health checks
+builder.Services
+    .AddHealthChecks()
+    // Database connectivity check
+    .AddSqlServer(
+        connectionString: builder.Configuration.GetConnectionString("PostgreSQL"),
+        name: "database",
+        failureStatus: HealthStatus.Unhealthy,
+        timeout: TimeSpan.FromSeconds(5))
+    // CPU and Memory checks (custom)
+    .AddCheck("cpu-usage", new CpuHealthCheck(threshold: 80), 
+        HealthStatus.Degraded, tags: new[] { "metrics" })
+    .AddCheck("memory-usage", new MemoryHealthCheck(threshold: 85), 
+        HealthStatus.Degraded, tags: new[] { "metrics" })
+    .AddCheck("request-queue", new RequestQueueHealthCheck(threshold: 100), 
+        HealthStatus.Degraded, tags: new[] { "metrics" });
+
+var app = builder.Build();
+
+// Health check endpoints
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = healthcheck => healthcheck.Tags.Contains("live"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = healthcheck => healthcheck.Tags.Contains("ready"),
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+app.MapHealthChecks("/health/detailed", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    ResponseWriter = UIResponseWriter.WriteHealthCheckUIResponse
+});
+
+app.Run();
+```
+
+**3. Custom Health Check Classes:**
+
+**CPU Usage Check:**
+```csharp
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Diagnostics;
+
+public class CpuHealthCheck : IHealthCheck
+{
+    private readonly int _threshold; // Percentage (0-100)
+    private readonly Process _currentProcess;
+
+    public CpuHealthCheck(int threshold = 80)
+    {
+        _threshold = threshold;
+        _currentProcess = Process.GetCurrentProcess();
+    }
+
+    public Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var startTime = DateTime.UtcNow;
+        var startCpuUsage = _currentProcess.TotalProcessorTime;
+
+        System.Threading.Thread.Sleep(100); // Sample over 100ms
+
+        var endTime = DateTime.UtcNow;
+        var endCpuUsage = _currentProcess.TotalProcessorTime;
+
+        var cpuUsedMs = (endCpuUsage - startCpuUsage).TotalMilliseconds;
+        var totalMsPassed = (endTime - startTime).TotalMilliseconds;
+        var cpuUsageTotal = cpuUsedMs / (Environment.ProcessorCount * totalMsPassed);
+        var cpuPercent = cpuUsageTotal * 100;
+
+        var status = cpuPercent < _threshold 
+            ? HealthStatus.Healthy 
+            : HealthStatus.Degraded;
+
+        var data = new Dictionary<string, object>
+        {
+            { "CPU Usage (%)", Math.Round(cpuPercent, 2) },
+            { "Threshold (%)", _threshold },
+            { "Status", status.ToString() }
+        };
+
+        var message = $"CPU usage is {Math.Round(cpuPercent, 2)}% (threshold: {_threshold}%)";
+        
+        return Task.FromResult(
+            status == HealthStatus.Healthy
+                ? HealthCheckResult.Healthy(message, data)
+                : HealthCheckResult.Degraded(message, null, data));
+    }
+}
+```
+
+**Memory Usage Check:**
+```csharp
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using System.Diagnostics;
+
+public class MemoryHealthCheck : IHealthCheck
+{
+    private readonly int _threshold; // Percentage (0-100)
+
+    public MemoryHealthCheck(int threshold = 85)
+    {
+        _threshold = threshold;
+    }
+
+    public Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var process = Process.GetCurrentProcess();
+        var workingSetMb = process.WorkingSet64 / (1024 * 1024);
+        
+        // Container memory limit from environment (Kubernetes)
+        var memoryLimitMb = long.TryParse(
+            Environment.GetEnvironmentVariable("MEMORY_LIMIT_MB"), 
+            out var limit) 
+            ? limit 
+            : 1024; // Default to 1GB if not set
+
+        var memoryPercent = (double)workingSetMb / memoryLimitMb * 100;
+
+        var status = memoryPercent < _threshold 
+            ? HealthStatus.Healthy 
+            : HealthStatus.Degraded;
+
+        var data = new Dictionary<string, object>
+        {
+            { "Working Set (MB)", Math.Round((double)workingSetMb, 2) },
+            { "Memory Limit (MB)", memoryLimitMb },
+            { "Usage (%)", Math.Round(memoryPercent, 2) },
+            { "Threshold (%)", _threshold }
+        };
+
+        var message = $"Memory usage is {Math.Round(memoryPercent, 2)}% of {memoryLimitMb}MB (threshold: {_threshold}%)";
+
+        return Task.FromResult(
+            status == HealthStatus.Healthy
+                ? HealthCheckResult.Healthy(message, data)
+                : HealthCheckResult.Degraded(message, null, data));
+    }
+}
+```
+
+**Request Queue Check:**
+```csharp
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+
+public class RequestQueueHealthCheck : IHealthCheck
+{
+    private readonly int _threshold; // Max queued requests
+
+    public RequestQueueHealthCheck(int threshold = 100)
+    {
+        _threshold = threshold;
+    }
+
+    public Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        // Track request queue via middleware
+        var queuedRequests = RequestQueueMiddleware.QueuedRequestCount;
+        var status = queuedRequests < _threshold 
+            ? HealthStatus.Healthy 
+            : HealthStatus.Degraded;
+
+        var data = new Dictionary<string, object>
+        {
+            { "Queued Requests", queuedRequests },
+            { "Threshold", _threshold }
+        };
+
+        var message = $"{queuedRequests} requests queued (threshold: {_threshold})";
+
+        return Task.FromResult(
+            status == HealthStatus.Healthy
+                ? HealthCheckResult.Healthy(message, data)
+                : HealthCheckResult.Degraded(message, null, data));
+    }
+}
+
+// Middleware to track queued requests
+public class RequestQueueMiddleware
+{
+    public static int QueuedRequestCount = 0;
+    private readonly RequestDelegate _next;
+
+    public RequestQueueMiddleware(RequestDelegate next)
+    {
+        _next = next;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        Interlocked.Increment(ref QueuedRequestCount);
+        try
+        {
+            await _next(context);
+        }
+        finally
+        {
+            Interlocked.Decrement(ref QueuedRequestCount);
+        }
+    }
+}
+
+// Register in Program.cs
+app.UseMiddleware<RequestQueueMiddleware>();
+```
+
+**4. Kubernetes Probe Configuration:**
+
+**Liveness Probe** (Restart pod if unhealthy):
+```yaml
+livenessProbe:
+  httpGet:
+    path: /health/live
+    port: 8080
+    scheme: HTTP
+  initialDelaySeconds: 30      # Wait 30s before first check
+  periodSeconds: 10             # Check every 10s
+  timeoutSeconds: 5             # Timeout after 5s
+  failureThreshold: 3           # Fail after 3 consecutive failures
+  successThreshold: 1           # Success after 1 passing check
+```
+
+**Readiness Probe** (Remove from load balancer if not ready):
+```yaml
+readinessProbe:
+  httpGet:
+    path: /health/ready
+    port: 8080
+    scheme: HTTP
+  initialDelaySeconds: 10       # Wait 10s before first check
+  periodSeconds: 5              # Check every 5s
+  timeoutSeconds: 3             # Timeout after 3s
+  failureThreshold: 2           # Fail after 2 consecutive failures
+  successThreshold: 1           # Success after 1 passing check
+```
+
+**Startup Probe** (Support slow-starting .NET apps):
+```yaml
+startupProbe:
+  httpGet:
+    path: /health/live
+    port: 8080
+    scheme: HTTP
+  initialDelaySeconds: 0
+  periodSeconds: 10             # Check every 10s
+  timeoutSeconds: 5             # Timeout after 5s
+  failureThreshold: 30          # Allow 30 failures × 10s = 5 minutes startup time
+  successThreshold: 1           # Success after 1 passing check
+```
+
+**Complete Kubernetes Deployment Example:**
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acme-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: acme-api
+  template:
+    metadata:
+      labels:
+        app: acme-api
+    spec:
+      containers:
+      - name: acme-api
+        image: acme/api:latest
+        ports:
+        - containerPort: 8080
+        
+        # Environment variables for health checks
+        env:
+        - name: MEMORY_LIMIT_MB
+          valueFrom:
+            resourceFieldRef:
+              containerResource: limits.memory
+              divisor: 1Mi
+        
+        resources:
+          requests:
+            cpu: 250m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        
+        # Liveness: Restart if repeatedly unhealthy
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness: Remove from load balancer if not ready
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        
+        # Startup: Allow time for .NET runtime initialization
+        startupProbe:
+          httpGet:
+            path: /health/live
+            port: 8080
+          periodSeconds: 10
+          failureThreshold: 30
+```
+
+#### Health Check Endpoints
+
+| Endpoint | Purpose | Probes | Metrics |
+|----------|---------|--------|---------|
+| `/health/live` | Application is running | Liveness, Startup | Basic status |
+| `/health/ready` | Application is ready to receive traffic | Readiness | Dependencies (DB, cache) |
+| `/health/detailed` | Comprehensive health report | Manual checks | CPU, memory, requests, database |
+
+**Sample Response** (`/health/detailed`):
+```json
+{
+  "status": "Degraded",
+  "totalDuration": "00:00:00.2456789",
+  "entries": {
+    "database": {
+      "data": {},
+      "description": null,
+      "duration": "00:00:00.0123456",
+      "status": "Healthy",
+      "tags": []
+    },
+    "cpu-usage": {
+      "data": {
+        "CPU Usage (%)": 45.67,
+        "Threshold (%)": 80,
+        "Status": "Healthy"
+      },
+      "description": "CPU usage is 45.67% (threshold: 80%)",
+      "duration": "00:00:00.0654321",
+      "status": "Healthy",
+      "tags": ["metrics"]
+    },
+    "memory-usage": {
+      "data": {
+        "Working Set (MB)": 312.5,
+        "Memory Limit (MB)": 1024,
+        "Usage (%)": 30.52,
+        "Threshold (%)": 85
+      },
+      "description": "Memory usage is 30.52% of 1024MB (threshold: 85%)",
+      "duration": "00:00:00.0234567",
+      "status": "Healthy",
+      "tags": ["metrics"]
+    },
+    "request-queue": {
+      "data": {
+        "Queued Requests": 5,
+        "Threshold": 100
+      },
+      "description": "5 requests queued (threshold: 100)",
+      "duration": "00:00:00.0012345",
+      "status": "Healthy",
+      "tags": ["metrics"]
+    }
+  }
+}
+```
+
+#### Health Check Monitoring
+
+**Prometheus Metrics:**
+- `health_check_status` - 1 (healthy) or 0 (unhealthy)
+- `health_check_cpu_percent` - CPU usage percentage
+- `health_check_memory_mb` - Memory usage in MB
+- `health_check_request_queue` - Queued requests count
+
+**Grafana Dashboard Queries:**
+```promql
+# Pod health status
+health_check_status{pod="acme-api"}
+
+# Memory trend (last 1 hour)
+health_check_memory_mb{pod="acme-api"}[1h]
+
+# CPU usage over time
+health_check_cpu_percent{pod="acme-api"}[5m]
+
+# Request queue depth
+rate(health_check_request_queue{pod="acme-api"}[1m])
+```
+
+#### Health Check Best Practices
+
+1. **Startup Probe (5 min timeout):** Accommodates .NET runtime JIT compilation and database initialization
+2. **Readiness Probe (fast check):** Validates dependencies are healthy before routing traffic
+3. **Liveness Probe (moderate check):** Detects hung or deadlocked processes
+4. **Resource Thresholds:** CPU 80%, Memory 85% to trigger degraded state before limits
+5. **Monitoring:** Export metrics to Prometheus for alerting on health trends
+
+#### Troubleshooting Health Checks
+
+**Pod stuck in NotReady:**
+```bash
+# Check readiness probe status
+kubectl describe pod <pod-name> -n application
+
+# Test endpoint directly
+kubectl port-forward <pod-name> 8080:8080
+curl http://localhost:8080/health/detailed
+```
+
+**High CPU/Memory in health checks:**
+```bash
+# Adjust thresholds in custom health check classes
+# Or increase resource limits in Kubernetes manifest
+```
+
+**Health checks timing out:**
+```bash
+# Increase initialDelaySeconds for slow startup
+# Increase timeoutSeconds if checks take long
+# Verify network connectivity to dependencies
+```
 
 ---
 

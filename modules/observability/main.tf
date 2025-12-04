@@ -202,6 +202,12 @@ resource "helm_release" "otel_collector" {
             }
           }
         }
+        
+        extensions = {
+          zpages = {
+            endpoint = "0.0.0.0:55679"
+          }
+        }
 
         processors = {
           batch = {
@@ -219,13 +225,27 @@ resource "helm_release" "otel_collector" {
                 key    = "deployment.environment"
                 value  = "production"
                 action = "upsert"
+              },
+              {
+                key    = "correlation.id.header"
+                value  = var.correlation_id_header_name
+                action = "upsert"
+              },
+              {
+                key    = "trace.context.format"
+                value  = var.trace_context_format
+                action = "upsert"
               }
             ]
+          }
+          resource_detection = {
+            detectors = ["gke", "gce", "aws", "azure", "docker", "env", "system"]
+            override  = true
           }
           probabilistic_sampler = {
             sampling_percentage = var.sampling_percentage
           }
-        }
+          }
 
         exporters = {
           otlp = {
@@ -246,7 +266,7 @@ resource "helm_release" "otel_collector" {
           pipelines = {
             traces = {
               receivers  = ["otlp", "jaeger"]
-              processors = ["memory_limiter", "batch", "attributes", "probabilistic_sampler"]
+              processors = ["memory_limiter", "resource_detection", "batch", "attributes", "probabilistic_sampler"]
               exporters  = var.enable_jaeger && var.enable_tempo ? ["otlp", "otlphttp", "logging"] : var.enable_jaeger ? ["otlp", "logging"] : ["otlphttp", "logging"]
             }
             metrics = {

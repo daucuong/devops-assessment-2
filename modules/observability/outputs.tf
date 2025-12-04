@@ -176,3 +176,51 @@ output "check_all_observability_pods_command" {
   description = "Command to check all observability pods"
   value       = var.enable_observability ? "kubectl get pods -n ${kubernetes_namespace.observability[0].metadata[0].name}" : ""
 }
+
+# Correlation ID and APM Configuration
+output "correlation_id_propagation_enabled" {
+  description = "Correlation ID propagation enabled"
+  value       = var.enable_correlation_id_propagation
+}
+
+output "correlation_id_header_name" {
+  description = "HTTP header name for correlation ID"
+  value       = var.correlation_id_header_name
+}
+
+output "trace_context_format" {
+  description = "Trace context format in use"
+  value       = var.trace_context_format
+}
+
+output "baggage_propagation_enabled" {
+  description = "OpenTelemetry Baggage propagation enabled"
+  value       = var.enable_baggage_propagation
+}
+
+output "apm_configuration_guide" {
+  description = "Guide for APM and correlation ID integration"
+  value = <<-EOT
+    APM Configuration Guide:
+    
+    1. Correlation ID Header: ${var.correlation_id_header_name}
+       - Use this header in HTTP requests for distributed tracing
+       - Example: ${var.correlation_id_header_name}: "550e8400-e29b-41d4-a716-446655440000"
+    
+    2. Trace Context Format: ${var.trace_context_format}
+       - Supported formats: W3C Trace Context, Jaeger, B3, OT Trace
+       - Ensure your application libraries support ${var.trace_context_format}
+    
+    3. Instrumentation:
+       - Use OpenTelemetry SDK for your language
+       - Configure OTEL_EXPORTER_OTLP_ENDPOINT to: opentelemetry-collector.${kubernetes_namespace.observability[0].metadata[0].name}.svc:${var.otlp_grpc_port}
+    
+    4. Baggage Propagation: ${var.enable_baggage_propagation ? "Enabled" : "Disabled"}
+       - Baggage allows propagating key-value pairs across service boundaries
+       - Configure your OTEL SDK with BaggagePropagator
+    
+    5. Tracing Backends:
+       - Jaeger Query: http://jaeger-query.${kubernetes_namespace.observability[0].metadata[0].name}:16686
+       - Tempo: http://tempo.${kubernetes_namespace.observability[0].metadata[0].name}:3100
+  EOT
+}
