@@ -27,6 +27,54 @@ resource "helm_release" "nginx_ingress" {
             memory = var.nginx_memory_limit
           }
         }
+        # High availability configuration
+        replicaCount = 2
+        # Pod disruption budget to ensure availability during maintenance
+        podDisruptionBudget = {
+          enabled = true
+          minAvailable = 1
+        }
+        # Affinity rules for pod distribution
+        affinity = {
+          podAntiAffinity = {
+            preferredDuringSchedulingIgnoredDuringExecution = [
+              {
+                weight = 100
+                podAffinityTerm = {
+                  labelSelector = {
+                    matchExpressions = [
+                      {
+                        key      = "app.kubernetes.io/name"
+                        operator = "In"
+                        values   = ["ingress-nginx"]
+                      }
+                    ]
+                  }
+                  topologyKey = "kubernetes.io/hostname"
+                }
+              }
+            ]
+          }
+        }
+        # Enable metrics for monitoring
+        metrics = {
+          enabled = true
+        }
+        # Security context
+        securityContext = {
+          runAsNonRoot = true
+          readOnlyRootFilesystem = true
+        }
+        # Rate limiting and request handling
+        config = {
+          "client-body-timeout"      = "600"
+          "client-header-timeout"    = "600"
+          "client-max-body-size"     = "20m"
+          "upstream-keepalive-timeout" = "60"
+          "upstream-keepalive-requests" = "100"
+          "keep-alive"               = "75"
+          "keep-alive-requests"      = "100"
+        }
       }
     })
   ]
@@ -46,6 +94,12 @@ resource "kubernetes_ingress_v1" "app_ingress" {
 
   spec {
     ingress_class_name = "nginx"
+
+    # TLS configuration
+    tls {
+      hosts       = ["www.acme.com"]
+      secret_name = "acme-tls"
+    }
 
     # Single host rule with path-based routing
     rule {
