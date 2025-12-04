@@ -157,9 +157,14 @@ output "app_release_status" {
   value       = module.application.release_status
 }
 
-output "app_service_name" {
-  description = "ACME application service name"
-  value       = module.application.service_name
+output "app_ui_service_name" {
+  description = "ACME UI service name"
+  value       = module.application.ui_service_name
+}
+
+output "app_api_service_name" {
+  description = "ACME API service name"
+  value       = module.application.api_service_name
 }
 
 output "app_service_port" {

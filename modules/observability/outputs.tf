@@ -13,7 +13,7 @@ output "otel_collector_enabled" {
 
 output "otel_collector_release_name" {
   description = "OpenTelemetry Collector Helm release name"
-  value       = var.enable_observability && var.enable_otel_collector ? helm_release.otel_collector[0].metadata[0].name : ""
+  value       = var.enable_observability && var.enable_otel_collector ? helm_release.otel_collector[0].name : ""
 }
 
 output "otel_collector_mode" {
@@ -49,7 +49,7 @@ output "jaeger_enabled" {
 
 output "jaeger_release_name" {
   description = "Jaeger Helm release name"
-  value       = var.enable_observability && var.enable_jaeger ? helm_release.jaeger[0].metadata[0].name : ""
+  value       = var.enable_observability && var.enable_jaeger ? helm_release.jaeger[0].name : ""
 }
 
 output "jaeger_release_status" {
@@ -90,7 +90,7 @@ output "tempo_enabled" {
 
 output "tempo_release_name" {
   description = "Tempo Helm release name"
-  value       = var.enable_observability && var.enable_tempo ? helm_release.tempo[0].metadata[0].name : ""
+  value       = var.enable_observability && var.enable_tempo ? helm_release.tempo[0].name : ""
 }
 
 output "tempo_release_status" {

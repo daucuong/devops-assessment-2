@@ -70,20 +70,15 @@ resource "helm_release" "external_secrets" {
   namespace  = kubernetes_namespace.security.metadata[0].name
   version    = var.external_secrets_version
 
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.create"
-    value = "false"
-  }
-
-  set {
-    name  = "serviceAccount.name"
-    value = kubernetes_service_account.external_secrets[0].metadata[0].name
-  }
+  values = [
+    yamlencode({
+      installCRDs = true
+      serviceAccount = {
+        create = false
+        name   = kubernetes_service_account.external_secrets[0].metadata[0].name
+      }
+    })
+  ]
 
   depends_on = [
     kubernetes_cluster_role_binding.external_secrets

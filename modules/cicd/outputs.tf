@@ -7,7 +7,7 @@ output "argocd_namespace" {
 
 output "argocd_release_name" {
   description = "ArgoCD Helm release name"
-  value       = var.enable_cicd ? helm_release.argocd[0].metadata[0].name : ""
+  value       = var.enable_cicd ? helm_release.argocd[0].name : ""
 }
 
 output "argocd_release_status" {
