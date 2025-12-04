@@ -127,24 +127,67 @@ This infrastructure implements the ACME platform—a containerized, cloud-native
 - **Path:** `www.acme.com/` (root path, catch-all)
 - **Ports:** 80/443 (exposed via NGINX Ingress)
 - **Public:** Yes
-- **Replicas:** 2+ (configurable via HPA)
-- **Description:** Static/client-side web frontend serving the ACME UI
-- **Resource Limits:** 100m CPU request, 500m limit; 128Mi memory request, 512Mi limit
-- **Assumption:** The application is .NET Core latest version.
+- **Replicas:** 2+ (min) to 20+ (max, configurable via HPA)
+- **Description:** .NET Core web frontend serving the ACME UI
+- **Assumption:** The application is .NET Core latest version
+
+**Resource Configuration (.NET Core Optimized):**
+```
+CPU Request:    250m      # .NET runtime baseline (~100-150m) + headroom
+CPU Limit:      1000m     # 4x request for burst handling
+Memory Request: 256Mi     # .NET GC + heap + application buffer
+Memory Limit:   1Gi       # 4x request, critical for OOM prevention
+```
+
+**Horizontal Pod Autoscaling (HPA):**
+```
+Minimum Replicas:  2
+Maximum Replicas:  20
+CPU Threshold:     70%  # .NET responds well to CPU-based scaling
+Memory Threshold:  80%  # Scale early to avoid OOM kills
+```
+
+**Rationale for .NET Core:**
+- **.NET Runtime:** Requires ~100-150MB baseline for CLR + GC overhead
+- **CPU Scaling:** 70% threshold optimal; prevents thrashing while maintaining responsiveness
+- **Memory Protection:** 80% threshold + 4x limit prevents OOM kills (critical for .NET)
+- **Burst Capacity:** 4x CPU limit handles temporary load spikes from .NET workloads
 
 ### 2. **REST API**
 - **Image:** `acme/api`
 - **Path:** `www.acme.com/api` (path-based routing, replaces domain-based api.acme.com)
 - **Port:** 443 (HTTPS only, no HTTP)
 - **Public:** Yes
-- **Replicas:** 2+ (configurable via HPA)
-- **Request Timeout:** 600 seconds (connect, send, read, body)
-- **Description:** Stateless REST API backend serving application logic
+- **Replicas:** 2+ (min) to 20+ (max, configurable via HPA)
+- **Request Timeout:** 600 seconds (connect, send, read, body - backend processing)
+- **Description:** .NET Core stateless REST API backend serving application logic
 - **Environment Variables:**
   - `POSTGRES_URL` - Connection string to PostgreSQL
   - `METRICS_URL` - Endpoint for metrics collection
-- **Resource Limits:** 100m CPU request, 500m limit; 128Mi memory request, 512Mi limit
-- **Avoids CORS issues:** If the frontend is served from acme.com, calling acme.com/api avoids cross-origin configuration.
+- **CORS Optimization:** Path-based routing (acme.com/api) avoids cross-origin configuration issues
+
+**Resource Configuration (.NET Core Optimized):**
+```
+CPU Request:    250m      # .NET runtime baseline (~100-150m) + headroom
+CPU Limit:      1000m     # 4x request for burst handling
+Memory Request: 256Mi     # .NET GC + heap + application buffer
+Memory Limit:   1Gi       # 4x request, critical for OOM prevention
+```
+
+**Horizontal Pod Autoscaling (HPA):**
+```
+Minimum Replicas:  2
+Maximum Replicas:  20
+CPU Threshold:     70%  # .NET responds well to CPU-based scaling
+Memory Threshold:  80%  # Scale early to avoid OOM kills
+```
+
+**Rationale for .NET Core:**
+- **.NET Runtime:** Requires ~100-150MB baseline for CLR + GC overhead
+- **CPU Scaling:** 70% threshold optimal for API workloads; prevents request queuing
+- **Memory Protection:** 80% threshold + 4x limit prevents OOM kills during traffic spikes
+- **Burst Capacity:** 4x CPU limit handles API request bursts and complex operations
+- **Request Timeout:** 600s accommodates long-running .NET operations (async processing, batch jobs)
 
 ### 3. **PostgreSQL Database**
 - **Version:** 16 (latest)
@@ -286,28 +329,33 @@ modules/
 - **Metrics:** Enabled for Prometheus monitoring
 - **Security:** Non-root container, read-only filesystem
 
-### Horizontal Pod Autoscaling (HPA)
-- **UI & API Pods:** Auto-scale based on CPU (50%) and Memory (70%) utilization
-- **Configured Replicas:** 2 (minimum) → configurable maximum (default 10)
+### Horizontal Pod Autoscaling (HPA) - .NET Core Optimized
+- **UI & API Pods:** Auto-scale based on CPU (70%) and Memory (80%) utilization
+- **Configured Replicas:** 2 (minimum) → 20 (maximum, .NET workload scaling)
 - **Metrics Source:** Kubernetes Metrics Server (built-in)
+- **CPU Threshold (70%):** Optimal for .NET; prevents CPU thrashing, maintains responsiveness
+- **Memory Threshold (80%):** Early scale trigger prevents OOM kills critical for .NET GC
 
-### Resource Management
+### Resource Management (.NET Core Optimized)
 ```
-Application Pods:
-  CPU Request:     100m
-  CPU Limit:       500m
-  Memory Request:  128Mi
-  Memory Limit:    512Mi
+Application Pods (.NET Core):
+  CPU Request:     250m      # .NET runtime baseline (~100-150m) + headroom
+  CPU Limit:       1000m     # 4x request for burst handling
+  Memory Request:  256Mi     # .NET GC + heap + buffer
+  Memory Limit:    1Gi       # 4x request, prevents OOM
+  Min Replicas:    2
+  Max Replicas:    20
 
-NGINX Controller (HA):
+NGINX Ingress Controller (HA):
   Replicas:        2
-  CPU Request:     100m
-  CPU Limit:       500m
-  Memory Request:  90Mi
-  Memory Limit:    512Mi
+  CPU Request:     250m      # Per replica baseline
+  CPU Limit:       1000m     # 4x request for peak handling
+  Memory Request:  256Mi     # Connection buffers (~10KB per conn)
+  Memory Limit:    512Mi     # Memory leak protection
   Pod Disruption:  minAvailable = 1
-  Client timeout:  600s
+  Client timeout:  600s      # Long-running .NET operations
   Upstream timeout: 60s
+  Worker Conn:     2048 per worker
 
 OpenTelemetry Collector:
   CPU Request:     100m
@@ -315,6 +363,11 @@ OpenTelemetry Collector:
   Memory Request:  128Mi
   Memory Limit:    512Mi
 ```
+
+**Total Cluster Resources (minimum 2-node cluster):**
+- **Per Node Requests:** 250m (NGINX) + 250m*2 (2x app) = 750m CPU, 256Mi + 256Mi*2 = 768Mi memory
+- **Per Node Limits:** 1000m (NGINX) + 1000m*2 (2x app) = 3000m CPU, 512Mi + 1Gi*2 = 2.5Gi memory
+- **Recommendation:** 4-8 CPU cores, 8-16GB memory per node minimum for .NET workloads
 
 ### Database Scalability
 - **CloudNativePG HA cluster** with 3 instances
