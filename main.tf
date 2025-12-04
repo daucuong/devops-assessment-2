@@ -1,27 +1,58 @@
 terraform {
   required_version = ">= 1.0"
+
   required_providers {
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "~> 2.23"
+      version = "~> 2.38"
     }
+
     helm = {
       source  = "hashicorp/helm"
-      version = "~> 2.11"
+      version = "~> 3.0"
     }
   }
 }
 
 provider "kubernetes" {
   config_path    = var.kubeconfig_path
-  config_context = var.kubeconfig_context
 }
 
 provider "helm" {
-  kubernetes {
+  kubernetes = {
     config_path    = var.kubeconfig_path
-    config_context = var.kubeconfig_context
   }
+}
+
+module "application" {
+  source = "./modules/application"
+
+  create_namespace = var.app_create_namespace
+  app_namespace    = var.app_namespace_name
+
+  release_name = var.app_release_name
+
+  image_repository   = var.app_image_repository
+  image_tag          = var.app_image_tag
+  image_pull_policy  = var.app_image_pull_policy
+
+  replicas = var.app_replicas_count
+
+  service_type = var.app_service_type
+  service_port = var.app_service_port
+
+  enable_ingress      = var.app_enable_ingress
+  ingress_class       = var.app_ingress_class
+  ingress_annotations = var.app_ingress_annotations
+  ingress_hosts       = var.app_ingress_hosts
+  ingress_tls         = var.app_ingress_tls
+
+  cpu_request    = var.app_cpu_request
+  cpu_limit      = var.app_cpu_limit
+  memory_request = var.app_memory_request
+  memory_limit   = var.app_memory_limit
+
+  environment_variables = var.app_environment_variables
 }
 
 module "ingress" {
@@ -34,6 +65,10 @@ module "ingress" {
   nginx_memory_request   = var.nginx_memory_request
   nginx_cpu_limit        = var.nginx_cpu_limit
   nginx_memory_limit     = var.nginx_memory_limit
+
+  app_service_name       = var.app_ingress_service_name
+  app_service_port       = var.app_service_port
+  app_namespace          = var.app_namespace_name
 }
 
 module "security" {
@@ -64,40 +99,6 @@ module "database" {
   postgres_password       = var.postgres_password
   rto_minutes             = var.rto_minutes
   rpo_minutes             = var.rpo_minutes
-}
-
-module "application" {
-  source = "./modules/application"
-
-  create_namespace = var.app_create_namespace
-  app_namespace    = var.app_namespace_name
-
-  release_name    = var.app_release_name
-  repository      = var.app_repository
-  chart           = var.app_chart
-  chart_version   = var.app_chart_version
-
-  image_repository   = var.app_image_repository
-  image_tag          = var.app_image_tag
-  image_pull_policy  = var.app_image_pull_policy
-
-  replicas = var.app_replicas_count
-
-  service_type = var.app_service_type
-  service_port = var.app_service_port
-
-  enable_ingress      = var.app_enable_ingress
-  ingress_class       = var.app_ingress_class
-  ingress_annotations = var.app_ingress_annotations
-  ingress_hosts       = var.app_ingress_hosts
-  ingress_tls         = var.app_ingress_tls
-
-  cpu_request    = var.app_cpu_request
-  cpu_limit      = var.app_cpu_limit
-  memory_request = var.app_memory_request
-  memory_limit   = var.app_memory_limit
-
-  environment_variables = var.app_environment_variables
 }
 
 module "cicd" {

@@ -20,7 +20,7 @@ variable "ingress_namespace" {
 variable "nginx_service_type" {
   description = "Service type for NGINX Ingress"
   type        = string
-  default     = "NodePort"
+  default     = "LoadBalancer"
 }
 
 variable "nginx_cpu_request" {
@@ -158,33 +158,21 @@ variable "app_namespace_name" {
 }
 
 variable "app_release_name" {
-  description = "Helm release name for echo-server"
+  description = "Helm release name for ACME application"
   type        = string
-  default     = "echo-server"
+  default     = "acme"
 }
 
-variable "app_repository" {
-  description = "Helm repository URL for echo-server"
+variable "app_chart_path" {
+  description = "Path to local Helm chart for ACME application"
   type        = string
-  default     = "https://ealenn.github.io/charts"
-}
-
-variable "app_chart" {
-  description = "Helm chart name for echo-server"
-  type        = string
-  default     = "echo-server"
-}
-
-variable "app_chart_version" {
-  description = "Helm chart version for echo-server"
-  type        = string
-  default     = ""
+  default     = "../helm/acme"
 }
 
 variable "app_image_repository" {
-  description = "Docker image repository for echo-server"
+  description = "Docker image repository for ACME application"
   type        = string
-  default     = "ealen/echo-server"
+  default     = "acme"
 }
 
 variable "app_image_tag" {
@@ -206,13 +194,13 @@ variable "app_replicas_count" {
 }
 
 variable "app_service_type" {
-  description = "Echo-server service type"
+  description = "ACME application service type"
   type        = string
   default     = "ClusterIP"
 }
 
 variable "app_service_port" {
-  description = "Echo-server service port"
+  description = "ACME application service port"
   type        = number
   default     = 3000
 }
@@ -220,7 +208,7 @@ variable "app_service_port" {
 variable "app_enable_ingress" {
   description = "Enable Ingress for echo-server"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "app_ingress_class" {
@@ -238,7 +226,7 @@ variable "app_ingress_annotations" {
 }
 
 variable "app_ingress_hosts" {
-  description = "Ingress hosts for echo-server"
+  description = "Ingress hosts for acme.com"
   type = list(object({
     host  = string
     paths = optional(list(object({
@@ -248,7 +236,7 @@ variable "app_ingress_hosts" {
   }))
   default = [
     {
-      host = "echo-server.local"
+      host = "acme.com"
       paths = [
         {
           path     = "/"
@@ -260,7 +248,7 @@ variable "app_ingress_hosts" {
 }
 
 variable "app_ingress_tls" {
-  description = "Ingress TLS configuration for echo-server"
+  description = "Ingress TLS configuration for acme.com"
   type = list(object({
     secretName = string
     hosts      = list(string)
@@ -304,6 +292,31 @@ variable "app_environment_variables" {
       value = "3000"
     }
   ]
+}
+
+# Ingress Module Variables
+variable "app_ingress_service_name" {
+  description = "Name of the application service for ingress routing"
+  type        = string
+  default     = "acme"
+}
+
+variable "app_ingress_service_port" {
+  description = "Port of the application service for ingress routing"
+  type        = number
+  default     = 3000
+}
+
+variable "app_ingress_host" {
+  description = "Host for ingress rule (domain name)"
+  type        = string
+  default     = "acme.com"
+}
+
+variable "app_ingress_resource_name" {
+  description = "Name of the ingress resource"
+  type        = string
+  default     = "app-ingress"
 }
 
 # CI/CD Module Variables (ArgoCD)

@@ -141,54 +141,54 @@ output "grafana_password" {
   sensitive   = true
 }
 
-# Echo Server Application Outputs
+# ACME Application Outputs
 output "app_namespace" {
-  description = "Echo Server namespace"
+  description = "ACME application namespace"
   value       = module.application.namespace
 }
 
 output "app_release_name" {
-  description = "Echo Server Helm release name"
+  description = "ACME application Helm release name"
   value       = module.application.release_name
 }
 
 output "app_release_status" {
-  description = "Echo Server Helm release status"
+  description = "ACME application Helm release status"
   value       = module.application.release_status
 }
 
 output "app_service_name" {
-  description = "Echo Server service name"
+  description = "ACME application service name"
   value       = module.application.service_name
 }
 
 output "app_service_port" {
-  description = "Echo Server service port"
+  description = "ACME application service port"
   value       = module.application.service_port
 }
 
 output "app_ingress_hosts" {
-  description = "Echo Server Ingress hosts"
+  description = "ACME application Ingress hosts"
   value       = module.application.ingress_hosts
 }
 
 output "app_port_forward_command" {
-  description = "Command to port-forward to Echo Server"
+  description = "Command to port-forward to ACME application"
   value       = module.application.port_forward_command
 }
 
 output "app_get_pods_command" {
-  description = "Command to view Echo Server pods"
+  description = "Command to view ACME application pods"
   value       = module.application.get_pods_command
 }
 
 output "app_logs_command" {
-  description = "Command to view Echo Server logs"
+  description = "Command to view ACME application logs"
   value       = module.application.logs_command
 }
 
 output "app_helm_status_command" {
-  description = "Command to check Echo Server Helm status"
+  description = "Command to check ACME application Helm status"
   value       = module.application.helm_status_command
 }
 

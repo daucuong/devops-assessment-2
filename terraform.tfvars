@@ -3,7 +3,7 @@ kubeconfig_context  = "docker-desktop"
 
 # NGINX Ingress
 ingress_namespace    = "ingress-nginx"
-nginx_service_type   = "NodePort"
+nginx_service_type   = "LoadBalancer"
 nginx_cpu_request    = "100m"
 nginx_memory_request = "90Mi"
 nginx_cpu_limit      = "500m"
@@ -33,15 +33,12 @@ postgres_storage_class = "backup-storage"
 rto_minutes = 5
 rpo_minutes = 1
 
-# Echo Server Application
+# ACME Application
 app_create_namespace  = true
 app_namespace_name    = "application"
-app_release_name      = "echo-server"
-app_repository        = "https://ealenn.github.io/charts"
-app_chart             = "echo-server"
-app_chart_version     = ""
+app_release_name      = "acme"
 
-app_image_repository  = "ealen/echo-server"
+app_image_repository  = "acme"
 app_image_tag         = "latest"
 app_image_pull_policy = "IfNotPresent"
 
@@ -49,7 +46,7 @@ app_replicas_count    = 2
 app_service_type      = "ClusterIP"
 app_service_port      = 3000
 
-app_enable_ingress    = true
+app_enable_ingress    = false
 app_ingress_class     = "nginx"
 app_ingress_annotations = {}
 app_ingress_hosts = []
@@ -66,3 +63,9 @@ app_environment_variables = [
     value = "3000"
   }
 ]
+
+# Ingress Module - Route acme.com to application
+app_ingress_service_name    = "acme"
+app_ingress_service_port    = 3000
+app_ingress_host            = "acme.com"
+app_ingress_resource_name   = "app-ingress"

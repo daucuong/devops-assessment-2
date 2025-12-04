@@ -5,22 +5,22 @@ output "namespace" {
 
 output "release_name" {
   description = "Helm release name"
-  value       = helm_release.echo_server.name
+  value       = helm_release.application.name
 }
 
 output "release_status" {
   description = "Helm release status"
-  value       = helm_release.echo_server.status
+  value       = helm_release.application.status
 }
 
 output "release_version" {
   description = "Helm release version"
-  value       = helm_release.echo_server.version
+  value       = helm_release.application.version
 }
 
 output "service_name" {
   description = "Service name"
-  value       = helm_release.echo_server.name
+  value       = helm_release.application.name
 }
 
 output "service_port" {
@@ -35,7 +35,7 @@ output "ingress_hosts" {
 
 output "port_forward_command" {
   description = "Command to port-forward to the service"
-  value       = "kubectl port-forward -n ${var.app_namespace} svc/${helm_release.echo_server.name} 8080:${var.service_port}"
+  value       = "kubectl port-forward -n ${var.app_namespace} svc/${helm_release.application.name} 8080:${var.service_port}"
 }
 
 output "get_pods_command" {
@@ -45,10 +45,10 @@ output "get_pods_command" {
 
 output "logs_command" {
   description = "Command to view logs"
-  value       = "kubectl logs -n ${var.app_namespace} -l app.kubernetes.io/name=echo-server -f"
+  value       = "kubectl logs -n ${var.app_namespace} -l app.kubernetes.io/name=${helm_release.application.name} -f"
 }
 
 output "helm_status_command" {
   description = "Command to check Helm release status"
-  value       = "helm status ${helm_release.echo_server.name} -n ${var.app_namespace}"
+  value       = "helm status ${helm_release.application.name} -n ${var.app_namespace}"
 }

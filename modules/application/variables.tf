@@ -14,32 +14,20 @@ variable "app_namespace" {
 variable "release_name" {
   description = "Helm release name"
   type        = string
-  default     = "echo-server"
+  default     = "acme"
 }
 
-variable "repository" {
-  description = "Helm repository URL"
+variable "chart_path" {
+  description = "Path to local Helm chart"
   type        = string
-  default     = "https://ealenn.github.io/charts"
-}
-
-variable "chart" {
-  description = "Helm chart name"
-  type        = string
-  default     = "echo-server"
-}
-
-variable "chart_version" {
-  description = "Helm chart version"
-  type        = string
-  default     = ""
+  default     = "./helm/acme"
 }
 
 # Container Image Configuration
 variable "image_repository" {
   description = "Docker image repository"
   type        = string
-  default     = "ealen/echo-server"
+  default     = "acme"
 }
 
 variable "image_tag" {
@@ -78,7 +66,7 @@ variable "service_port" {
 variable "enable_ingress" {
   description = "Enable Ingress"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "ingress_class" {
@@ -106,10 +94,14 @@ variable "ingress_hosts" {
   }))
   default = [
     {
-      host = "echo-server.local"
+      host = "acme.com"
       paths = [
         {
           path     = "/"
+          pathType = "Prefix"
+        },
+        {
+          path     = "/api"
           pathType = "Prefix"
         }
       ]

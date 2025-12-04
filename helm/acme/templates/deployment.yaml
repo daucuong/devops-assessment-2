@@ -1,0 +1,20 @@
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: acme
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: acme
+  template:
+    metadata:
+      labels:
+        app: acme
+    spec:
+      containers:
+      - name: acme
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        ports:
+        - containerPort: 3000

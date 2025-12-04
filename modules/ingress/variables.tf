@@ -32,7 +32,7 @@ variable "nginx_ingress_version" {
 variable "nginx_service_type" {
   description = "Service type for NGINX Ingress"
   type        = string
-  default     = "NodePort"
+  default     = "LoadBalancer"
 }
 
 variable "nginx_cpu_request" {
@@ -57,4 +57,35 @@ variable "nginx_memory_limit" {
   description = "Memory limit for NGINX controller"
   type        = string
   default     = "512Mi"
+}
+
+# Application Ingress Variables
+variable "app_namespace" {
+  description = "Namespace where application is deployed"
+  type        = string
+  default     = "default"
+}
+
+variable "app_service_name" {
+  description = "Name of the application service"
+  type        = string
+  default     = "acme"
+}
+
+variable "app_service_port" {
+  description = "Port of the application service"
+  type        = number
+  default     = 3000
+}
+
+variable "ingress_host" {
+  description = "Host for ingress rule (e.g., acme.com)"
+  type        = string
+  default     = "acme.com"
+}
+
+variable "ingress_name" {
+  description = "Name of the ingress resource"
+  type        = string
+  default     = "app-ingress"
 }

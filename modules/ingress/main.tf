@@ -31,3 +31,36 @@ resource "helm_release" "nginx_ingress" {
     })
   ]
 }
+
+resource "kubernetes_ingress_v1" "app_ingress" {
+  metadata {
+    name      = var.ingress_name
+    namespace = var.app_namespace
+  }
+
+  spec {
+    ingress_class_name = "nginx"
+
+    rule {
+      host = var.ingress_host
+
+      http {
+        path {
+          path      = "/"
+          path_type = "Prefix"
+
+          backend {
+            service {
+              name = var.app_service_name
+              port {
+                number = var.app_service_port
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  depends_on = [helm_release.nginx_ingress]
+}
