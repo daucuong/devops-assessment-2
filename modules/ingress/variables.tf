@@ -79,9 +79,9 @@ variable "app_service_port" {
 }
 
 variable "ingress_host" {
-  description = "Host for ingress rule (e.g., acme.com)"
+  description = "Host for ingress rule (e.g., www.acme.com)"
   type        = string
-  default     = "acme.com"
+  default     = "www.acme.com"
 }
 
 variable "ingress_name" {

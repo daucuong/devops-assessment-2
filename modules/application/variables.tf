@@ -94,14 +94,19 @@ variable "ingress_hosts" {
   }))
   default = [
     {
-      host = "acme.com"
+      host = "www.acme.com"
       paths = [
         {
           path     = "/"
           pathType = "Prefix"
-        },
+        }
+      ]
+    },
+    {
+      host = "api.acme.com"
+      paths = [
         {
-          path     = "/api"
+          path     = "/"
           pathType = "Prefix"
         }
       ]

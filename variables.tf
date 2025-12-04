@@ -226,7 +226,7 @@ variable "app_ingress_annotations" {
 }
 
 variable "app_ingress_hosts" {
-  description = "Ingress hosts for acme.com"
+  description = "Ingress hosts for www.acme.com and api.acme.com"
   type = list(object({
     host  = string
     paths = optional(list(object({
@@ -236,7 +236,16 @@ variable "app_ingress_hosts" {
   }))
   default = [
     {
-      host = "acme.com"
+      host = "www.acme.com"
+      paths = [
+        {
+          path     = "/"
+          pathType = "Prefix"
+        }
+      ]
+    },
+    {
+      host = "api.acme.com"
       paths = [
         {
           path     = "/"
@@ -248,7 +257,7 @@ variable "app_ingress_hosts" {
 }
 
 variable "app_ingress_tls" {
-  description = "Ingress TLS configuration for acme.com"
+  description = "Ingress TLS configuration for www.acme.com and api.acme.com"
   type = list(object({
     secretName = string
     hosts      = list(string)
@@ -310,7 +319,7 @@ variable "app_ingress_service_port" {
 variable "app_ingress_host" {
   description = "Host for ingress rule (domain name)"
   type        = string
-  default     = "acme.com"
+  default     = "www.acme.com"
 }
 
 variable "app_ingress_resource_name" {

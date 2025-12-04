@@ -64,8 +64,8 @@ app_environment_variables = [
   }
 ]
 
-# Ingress Module - Route acme.com to application
+# Ingress Module - Route www.acme.com and api.acme.com to application
 app_ingress_service_name    = "acme"
 app_ingress_service_port    = 3000
-app_ingress_host            = "acme.com"
+app_ingress_host            = "www.acme.com"
 app_ingress_resource_name   = "app-ingress"
