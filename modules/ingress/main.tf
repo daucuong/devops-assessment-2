@@ -36,6 +36,12 @@ resource "kubernetes_ingress_v1" "app_ingress" {
   metadata {
     name      = var.ingress_name
     namespace = var.app_namespace
+    annotations = {
+      "nginx.ingress.kubernetes.io/proxy-connect-timeout" = "600"
+      "nginx.ingress.kubernetes.io/proxy-send-timeout"    = "600"
+      "nginx.ingress.kubernetes.io/proxy-read-timeout"    = "600"
+      "nginx.ingress.kubernetes.io/proxy-body-timeout"    = "600"
+    }
   }
 
   spec {
