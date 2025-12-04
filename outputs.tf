@@ -383,3 +383,49 @@ output "sampling_percentage" {
   description = "Trace sampling percentage"
   value       = module.observability.sampling_percentage
 }
+
+# Backup Module Outputs (Velero)
+output "velero_namespace" {
+  description = "Velero backup namespace"
+  value       = module.backup.velero_namespace
+}
+
+output "velero_enabled" {
+  description = "Velero backup enabled"
+  value       = module.backup.velero_enabled
+}
+
+output "velero_release_name" {
+  description = "Velero Helm release name"
+  value       = module.backup.velero_release_name
+}
+
+output "velero_release_status" {
+  description = "Velero Helm release status"
+  value       = module.backup.velero_release_status
+}
+
+output "velero_backup_retention_days" {
+  description = "Backup retention period in days"
+  value       = module.backup.velero_backup_retention_days
+}
+
+output "velero_get_backups_command" {
+  description = "Command to list Velero backups"
+  value       = module.backup.velero_get_backups_command
+}
+
+output "velero_get_schedules_command" {
+  description = "Command to list Velero backup schedules"
+  value       = module.backup.velero_get_schedules_command
+}
+
+output "database_backup_schedule" {
+  description = "Database backup schedule (cron)"
+  value       = module.backup.database_backup_schedule
+}
+
+output "config_backup_schedule" {
+  description = "Application config backup schedule (cron)"
+  value       = module.backup.config_backup_schedule
+}

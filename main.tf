@@ -171,3 +171,29 @@ module "observability" {
   metrics_port                      = var.metrics_port
   health_check_port                 = var.health_check_port
 }
+
+module "backup" {
+  source = "./modules/backup"
+
+  enable_backup                  = var.enable_backup
+  velero_namespace               = var.velero_namespace
+  velero_release_name            = var.velero_release_name
+  velero_repository              = var.velero_repository
+  velero_chart                   = var.velero_chart
+  velero_chart_version           = var.velero_chart_version
+  velero_storage_location        = var.velero_storage_location
+  velero_backup_storage_bucket   = var.velero_backup_storage_bucket
+  velero_snapshot_location       = var.velero_snapshot_location
+  velero_enable_snapshots        = var.velero_enable_snapshots
+  velero_cpu_request             = var.velero_cpu_request
+  velero_memory_request          = var.velero_memory_request
+  velero_cpu_limit               = var.velero_cpu_limit
+  velero_memory_limit            = var.velero_memory_limit
+  velero_backup_retention_days   = var.velero_backup_retention_days
+  velero_schedule_database_backup = var.velero_schedule_database_backup
+  velero_database_backup_schedule = var.velero_database_backup_schedule
+  velero_schedule_config_backup   = var.velero_schedule_config_backup
+  velero_config_backup_schedule   = var.velero_config_backup_schedule
+  backup_namespaces              = var.backup_namespaces
+  velero_aws_credentials_secret  = var.velero_aws_credentials_secret
+}

@@ -11,6 +11,11 @@ api:
     repository: acme-api
     tag: latest
   replicas: 2
+  environment:
+    - name: POSTGRES_URL
+      value: "postgresql://postgres:postgres@postgres-primary.database.svc.cluster.local:5432/acme"
+    - name: METRICS_URL
+      value: "http://opentelemetry-collector.observability.svc.cluster.local:4318"
 
 service:
   type: LoadBalancer

@@ -29,6 +29,7 @@ This infrastructure implements the ACME platform—a containerized, cloud-native
 - **Database:** PostgreSQL (HA Cluster via CloudNativePG)
 - **Observability:** Prometheus, Grafana, OpenTelemetry, Jaeger, Tempo
 - **Security:** cert-manager, External Secrets Operator, Network Policies
+- **Backup & Disaster Recovery:** Velero (backup orchestration and restoration)
 
 ---
 
@@ -95,6 +96,13 @@ This infrastructure implements the ACME platform—a containerized, cloud-native
     │  │  CI/CD Namespace (argocd)            │   │
     │  │  └─ ArgoCD Controller                │   │
     │  │     └─ Git-driven deployments        │   │
+    │  └──────────────────────────────────────┘   │
+    │                                             │
+    │  ┌──────────────────────────────────────┐   │
+    │  │  Backup Namespace (velero)           │   │
+    │  │  └─ Velero Server                    │   │
+    │  │     ├─ Scheduled backups             │   │
+    │  │     └─ Backup/restore operations     │   │
     │  └──────────────────────────────────────┘   │
     └────┬────────────────────────────────────────┘
          │
@@ -189,6 +197,7 @@ This infrastructure implements the ACME platform—a containerized, cloud-native
 | Grafana Tempo | `grafana/tempo` | `observability` | Trace storage backend |
 | CloudNativePG | `cloudnative-pg/cloudnative-pg` | `database` | PostgreSQL operator |
 | ArgoCD | `argoproj/argo-cd` | `argocd` | GitOps continuous deployment |
+| Velero | `vmware-tanzu/velero` | `velero` | Backup & disaster recovery |
 
 ### Terraform Modules
 
@@ -200,7 +209,8 @@ modules/
 ├── database/        # PostgreSQL HA cluster via CloudNativePG
 ├── monitoring/      # Prometheus & Grafana
 ├── cicd/            # ArgoCD deployment
-└── observability/   # OpenTelemetry, Jaeger, Tempo
+├── observability/   # OpenTelemetry, Jaeger, Tempo
+└── backup/          # Velero backup & disaster recovery
 ```
 
 ---
@@ -309,11 +319,28 @@ OpenTelemetry Collector:
 - **Persistent Volumes:** PVC-backed storage survives pod restarts
 - **Image Registry:** Container images must be accessible during recovery
 
-### Backup Recommendations
-1. **WAL Archiving:** Store PostgreSQL WAL files in S3/GCS/Blob storage
-2. **Full Database Backups:** Regular snapshots (daily/weekly)
+### Velero Backup & Disaster Recovery
+- **Scheduled Backups:** Automated daily backups of database and application configs
+  - Database backups: Daily at 2 AM UTC
+  - Application config backups: Daily at 3 AM UTC
+- **Backup Retention:** 30 days default (configurable)
+- **Backup Scope:**
+  - **Database:** PersistentVolumeClaims from `database` namespace
+  - **Application Config:** ConfigMaps, Secrets, Deployments, Services, Ingresses from `application` namespace
+- **Volume Snapshots:** Enabled for PVC-backed data
+- **Storage Locations:** Local storage, AWS S3, Azure, GCP (configurable)
+- **Restore Capabilities:**
+  - Point-in-time restore of specific resources
+  - Full cluster restore from backups
+  - Restore to same or different cluster
+- **Monitoring:** Prometheus metrics from Velero for backup success/failure tracking
+
+### Additional Backup Recommendations
+1. **WAL Archiving:** Store PostgreSQL WAL files in S3/GCS/Blob storage for PITR
+2. **Off-Cluster Storage:** Archive backups to cloud storage (AWS S3, Azure Blob, GCS)
 3. **Infrastructure State:** Terraform state backed up to secure storage
 4. **GitOps Repository:** All manifests version-controlled in Git (required for ArgoCD)
+5. **Backup Testing:** Regular restore drills to verify backup integrity
 
 ---
 
@@ -535,10 +562,12 @@ OpenTelemetry Collector:
    - No custom metric-based scaling
    - **Fix:** Implement custom metrics (request rate, queue depth) via KEDA
 
-4. **Database Backup Strategy Incomplete**
-   - No explicit WAL archiving configuration
-   - **Fix:** Configure WAL archiving to S3/GCS/Blob storage
-   - **Implementation:** Add backup policy to CloudNativePG spec
+4. **Database Backup Strategy Partially Complete**
+    - Velero backups implemented for basic disaster recovery
+    - WAL archiving not yet configured for true PITR
+    - **Fix:** Configure WAL archiving to S3/GCS/Blob storage
+    - **Implementation:** Add backup policy to CloudNativePG spec and WAL archiving destination
+    - **Current State:** Velero handles daily snapshots; WAL archiving adds continuous protection
 
 5. **No API Rate Limiting**
    - Vulnerable to abuse
@@ -560,8 +589,9 @@ OpenTelemetry Collector:
 ### Recommended Improvements
 
 #### Priority 1 (Critical)
+- [x] Implement basic backup & disaster recovery (Velero)
+- [ ] Configure WAL archiving for PostgreSQL continuous protection
 - [ ] Implement multi-region replication for database
-- [ ] Configure WAL archiving for PostgreSQL backups
 - [ ] Add comprehensive alert rules to Prometheus
 - [ ] Enable RBAC for ArgoCD and restrict service account permissions
 - [ ] Implement Pod Disruption Budgets for core services

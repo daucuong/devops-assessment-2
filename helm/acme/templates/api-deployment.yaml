@@ -29,6 +29,11 @@ spec:
         ports:
         - containerPort: 3000
           name: http
+        env:
+        {{- range .Values.api.environment }}
+        - name: {{ .name }}
+          value: {{ .value | quote }}
+        {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         livenessProbe:
