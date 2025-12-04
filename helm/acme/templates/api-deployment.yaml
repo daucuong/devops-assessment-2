@@ -2,29 +2,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: acme
+  name: acme-api
   labels:
     {{- include "acme.labels" . | nindent 4 }}
-    app.kubernetes.io/component: ui
+    app.kubernetes.io/component: api
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.ui.replicas }}
+  replicas: {{ .Values.api.replicas }}
   {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "acme.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
-      app.kubernetes.io/component: ui
+      app.kubernetes.io/component: api
   template:
     metadata:
       labels:
         app.kubernetes.io/name: {{ include "acme.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
-        app.kubernetes.io/component: ui
+        app.kubernetes.io/component: api
     spec:
       containers:
-      - name: acme
-        image: "{{ .Values.ui.image.repository }}:{{ .Values.ui.image.tag }}"
+      - name: acme-api
+        image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
         ports:
         - containerPort: 3000

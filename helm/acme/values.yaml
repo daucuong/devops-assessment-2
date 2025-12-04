@@ -1,9 +1,16 @@
+# UI Service Configuration
+ui:
+  image:
+    repository: acme
+    tag: latest
+  replicas: 2
 
-image:
-  repository: acme
-  tag: latest
-
-replicas: 2
+# API Service Configuration
+api:
+  image:
+    repository: acme-api
+    tag: latest
+  replicas: 2
 
 service:
   type: LoadBalancer
@@ -14,10 +21,14 @@ ingress:
   className: nginx
   hosts:
     - host: www.acme.com
+      service: acme
+      port: http
       paths:
         - path: /
           pathType: Prefix
     - host: api.acme.com
+      service: acme-api
+      port: http
       paths:
         - path: /
           pathType: Prefix

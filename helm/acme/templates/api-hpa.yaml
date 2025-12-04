@@ -2,16 +2,16 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: acme-hpa
+  name: acme-api-hpa
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "acme.labels" . | nindent 4 }}
-    app.kubernetes.io/component: ui
+    app.kubernetes.io/component: api
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: acme
+    name: acme-api
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:
