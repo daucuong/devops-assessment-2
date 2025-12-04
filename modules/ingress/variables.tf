@@ -64,27 +64,27 @@ variable "nginx_service_type" {
 }
 
 variable "nginx_cpu_request" {
-  description = "CPU request for NGINX controller"
+  description = "CPU request for NGINX controller (per replica baseline)"
   type        = string
-  default     = "100m"
+  default     = "250m"  # Baseline for moderate traffic, 2 replicas = 500m total
 }
 
 variable "nginx_memory_request" {
-  description = "Memory request for NGINX controller"
+  description = "Memory request for NGINX controller (connection buffers ~10KB per conn)"
   type        = string
-  default     = "90Mi"
+  default     = "256Mi"  # NGINX base ~50Mi + connection buffer overhead
 }
 
 variable "nginx_cpu_limit" {
-  description = "CPU limit for NGINX controller"
+  description = "CPU limit for NGINX controller (4x request for peak handling)"
   type        = string
-  default     = "500m"
+  default     = "1000m"  # 4x request for traffic spikes
 }
 
 variable "nginx_memory_limit" {
-  description = "Memory limit for NGINX controller"
+  description = "Memory limit for NGINX controller (safe for high throughput)"
   type        = string
-  default     = "512Mi"
+  default     = "512Mi"  # Prevents memory leaks from impacting other pods
 }
 
 # Application Ingress Variables

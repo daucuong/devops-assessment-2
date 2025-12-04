@@ -24,27 +24,27 @@ variable "nginx_service_type" {
 }
 
 variable "nginx_cpu_request" {
-  description = "CPU request for NGINX controller"
+  description = "CPU request for NGINX controller (per replica baseline)"
   type        = string
-  default     = "100m"
+  default     = "250m"  # Baseline for moderate traffic, 2 replicas = 500m total
 }
 
 variable "nginx_memory_request" {
-  description = "Memory request for NGINX controller"
+  description = "Memory request for NGINX controller (connection buffers ~10KB per conn)"
   type        = string
-  default     = "90Mi"
+  default     = "256Mi"  # NGINX base ~50Mi + connection buffer overhead
 }
 
 variable "nginx_cpu_limit" {
-  description = "CPU limit for NGINX controller"
+  description = "CPU limit for NGINX controller (4x request for peak handling)"
   type        = string
-  default     = "500m"
+  default     = "1000m"  # 4x request for traffic spikes
 }
 
 variable "nginx_memory_limit" {
-  description = "Memory limit for NGINX controller"
+  description = "Memory limit for NGINX controller (safe for high throughput)"
   type        = string
-  default     = "512Mi"
+  default     = "512Mi"  # Prevents memory leaks from impacting other pods
 }
 
 # Helm - Monitoring
@@ -279,27 +279,27 @@ variable "app_ingress_tls" {
 }
 
 variable "app_cpu_request" {
-  description = "CPU request for echo-server"
+  description = "CPU request for application (.NET Core baseline + headroom)"
   type        = string
-  default     = "100m"
+  default     = "250m"  # .NET runtime baseline ~100-150m, allowing headroom
 }
 
 variable "app_cpu_limit" {
-  description = "CPU limit for echo-server"
+  description = "CPU limit for application (4x request for burst)"
   type        = string
-  default     = "500m"
+  default     = "1000m"  # 4x request for .NET workload bursts
 }
 
 variable "app_memory_request" {
-  description = "Memory request for echo-server"
+  description = "Memory request for application (.NET GC + heap)"
   type        = string
-  default     = "128Mi"
+  default     = "256Mi"  # .NET runtime ~100-150Mi + app heap
 }
 
 variable "app_memory_limit" {
-  description = "Memory limit for echo-server"
+  description = "Memory limit for application (4x request, critical for .NET OOM)"
   type        = string
-  default     = "512Mi"
+  default     = "1Gi"  # 4x request, prevent OOM kills
 }
 
 variable "app_environment_variables" {
@@ -336,7 +336,7 @@ variable "app_autoscaling_max_replicas" {
 }
 
 variable "app_autoscaling_metrics" {
-  description = "Autoscaling metrics configuration"
+  description = "Autoscaling metrics configuration (.NET Core optimized)"
   type = list(object({
     type = string
     resource = optional(object({
@@ -355,7 +355,7 @@ variable "app_autoscaling_metrics" {
         name = "cpu"
         target = {
           type             = "Utilization"
-          averageUtilization = 50
+          averageUtilization = 70  # .NET responds well to CPU scaling; prevents thrashing
         }
       }
     },
@@ -365,7 +365,7 @@ variable "app_autoscaling_metrics" {
         name = "memory"
         target = {
           type             = "Utilization"
-          averageUtilization = 70
+          averageUtilization = 80  # Scale early to avoid .NET OOM kills
         }
       }
     }

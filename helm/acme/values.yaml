@@ -40,25 +40,25 @@ ingress:
 autoscaling:
   enabled: true
   minReplicas: 2
-  maxReplicas: 10
+  maxReplicas: 20                    # Support higher scaling for .NET workloads
   metrics:
     - type: Resource
       resource:
         name: cpu
         target:
           type: Utilization
-          averageUtilization: 50
+          averageUtilization: 70     # .NET responds well to CPU scaling
     - type: Resource
       resource:
         name: memory
         target:
           type: Utilization
-          averageUtilization: 70
+          averageUtilization: 80     # Scale early to avoid OOM kills
 
 resources:
   requests:
-    cpu: 100m
-    memory: 128Mi
+    cpu: 250m          # .NET Core runtime baseline ~100-150m + headroom
+    memory: 256Mi      # .NET GC + heap + app buffer
   limits:
-    cpu: 500m
-    memory: 512Mi
+    cpu: 1000m         # 4x request for .NET workload bursts
+    memory: 1Gi        # 4x request, critical for OOM prevention
