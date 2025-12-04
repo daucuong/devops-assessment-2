@@ -47,11 +47,27 @@ resource "kubernetes_ingress_v1" "app_ingress" {
   spec {
     ingress_class_name = "nginx"
 
-    # UI Route: www.acme.com -> acme service
+    # Single host rule with path-based routing
     rule {
       host = "www.acme.com"
 
       http {
+        # API Route: /api/* -> acme-api service
+        path {
+          path      = "/api"
+          path_type = "Prefix"
+
+          backend {
+            service {
+              name = "acme-api"
+              port {
+                name = "http"
+              }
+            }
+          }
+        }
+
+        # UI Route: / -> acme service (catch-all)
         path {
           path      = "/"
           path_type = "Prefix"
@@ -59,27 +75,6 @@ resource "kubernetes_ingress_v1" "app_ingress" {
           backend {
             service {
               name = "acme"
-              port {
-                name = "http"
-              }
-            }
-          }
-        }
-      }
-    }
-
-    # API Route: api.acme.com -> acme-api service
-    rule {
-      host = "api.acme.com"
-
-      http {
-        path {
-          path      = "/"
-          path_type = "Prefix"
-
-          backend {
-            service {
-              name = "acme-api"
               port {
                 name = "http"
               }

@@ -26,17 +26,15 @@ ingress:
   className: nginx
   hosts:
     - host: www.acme.com
-      service: acme
-      port: http
       paths:
+        - path: /api
+          pathType: Prefix
+          service: acme-api
+          port: http
         - path: /
           pathType: Prefix
-    - host: api.acme.com
-      service: acme-api
-      port: http
-      paths:
-        - path: /
-          pathType: Prefix
+          service: acme
+          port: http
 
 # Horizontal Pod Autoscaler
 autoscaling:

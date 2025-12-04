@@ -244,7 +244,7 @@ variable "app_ingress_annotations" {
 }
 
 variable "app_ingress_hosts" {
-  description = "Ingress hosts for www.acme.com and api.acme.com"
+  description = "Ingress hosts for www.acme.com with path-based routing"
   type = list(object({
     host  = string
     paths = optional(list(object({
@@ -257,14 +257,9 @@ variable "app_ingress_hosts" {
       host = "www.acme.com"
       paths = [
         {
-          path     = "/"
+          path     = "/api"
           pathType = "Prefix"
-        }
-      ]
-    },
-    {
-      host = "api.acme.com"
-      paths = [
+        },
         {
           path     = "/"
           pathType = "Prefix"

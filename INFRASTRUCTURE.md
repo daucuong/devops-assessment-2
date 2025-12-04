@@ -320,7 +320,7 @@ OpenTelemetry Collector:
 - **Scheduled Backups:** Automated daily backups of database and application configs
   - Database backups: Daily at 2 AM UTC
   - Application config backups: Daily at 3 AM UTC
-- **Backup Retention:** 30 days default (configurable)
+- **Backup Retention:** 30 days default (configurable) 1 year for enterprise
 - **Backup Scope:**
   - **Database:** PersistentVolumeClaims from `database` namespace
   - **Application Config:** ConfigMaps, Secrets, Deployments, Services, Ingresses from `application` namespace
