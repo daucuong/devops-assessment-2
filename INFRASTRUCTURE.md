@@ -9,8 +9,9 @@
 6. [Scalability](#scalability)
 7. [Disaster Recovery](#disaster-recovery)
 8. [Observability](#observability)
-9. [Recent Improvements](#recent-improvements-latest-updates)
-10. [References](#references)
+9. [Resource Tagging & Cost Management](#resource-tagging--cost-management)
+10. [Recent Improvements](#recent-improvements-latest-updates)
+11. [References](#references)
 
 ---
 
@@ -129,6 +130,7 @@ This infrastructure implements the ACME platform—a containerized, cloud-native
 - **Replicas:** 2+ (configurable via HPA)
 - **Description:** Static/client-side web frontend serving the ACME UI
 - **Resource Limits:** 100m CPU request, 500m limit; 128Mi memory request, 512Mi limit
+- **Assumption:** The application is .NET Core latest version.
 
 ### 2. **REST API**
 - **Image:** `acme/api`
@@ -234,6 +236,9 @@ modules/
   - Proxy Send Timeout: 600 seconds
   - Proxy Read Timeout: 600 seconds
   - Proxy Body Timeout: 600 seconds
+  - Max body size: 20MB
+  - Log format: Upstream log format (detailed request information)
+  - Worker Configuration: Auto-scaling workers with 2048 connections per worker
 
 ### Secret Management
 - **External Secrets Operator** (optional) integrates with external vaults:
@@ -415,25 +420,98 @@ OpenTelemetry Collector:
 
 ---
 
-## Recent Improvements (Latest Updates)
+## Resource Tagging & Cost Management
 
-### Ingress Routing Enhancement
-- **Changed:** Routing model from multi-domain (`www.acme.com` + `api.acme.com`) to path-based routing
-- **New Model:** Single domain (`www.acme.com`) with path-based routing:
-  - `www.acme.com/` → UI service
-  - `www.acme.com/api` → API service
-- **Benefits:** Simpler TLS certificate management, cleaner DNS configuration, reduced operational complexity
+### Tagging Strategy
 
-### NGINX Ingress Controller Hardening
-- **High Availability:** 2 replicas with pod anti-affinity for node distribution
-- **Reliability:** Pod Disruption Budget ensures 1 replica always available during maintenance
-- **Request Handling:**
-  - Client body timeout: 600s
-  - Client header timeout: 600s
-  - Upstream keepalive: 60s with 100 requests per connection
-  - Max body size: 20MB
-- **Security:** Non-root container with read-only filesystem
-- **Observability:** Metrics enabled for Prometheus monitoring
+All Kubernetes resources are comprehensively tagged using labels and annotations for:
+- **Cost allocation** and billing analysis
+- **Resource organization** and lifecycle management
+- **Automation** and policy enforcement
+- **Monitoring** and alerting
+
+### Standard Labels
+
+All resources receive the following standardized labels:
+
+| Label | Value | Purpose |
+|-------|-------|---------|
+| `app.kubernetes.io/name` | Component name (e.g., `ingress-nginx`, `acme-database`) | Identifies the application/service |
+| `app.kubernetes.io/component` | Component type (e.g., `ingress-controller`, `database`, `application`) | Categorizes the component type |
+| `app.kubernetes.io/managed-by` | `terraform` | Indicates infrastructure-as-code ownership |
+| `environment` | `dev`, `staging`, `prod` | Deployment environment (configurable) |
+| `project` | `acme` | Project identifier (configurable) |
+| `owner` | `platform` | Team responsible (configurable) |
+| `cost-center` | Engineering team | For billing and cost allocation |
+| `namespace-purpose` | Purpose of namespace | Clarifies namespace function |
+| `resource-type` | Resource kind (e.g., `ingress`, `service`) | Resource classification |
+| `managed-by` | `terraform` | IaC management indicator |
+
+### Per-Module Tagging
+
+Each Terraform module applies tags to its resources:
+
+| Module | Resources Tagged | Component Label | Namespace Label |
+|--------|------------------|-----------------|-----------------|
+| `ingress` | NGINX Ingress, Namespace | `ingress-controller` | `ingress-controller` |
+| `application` | Helm Release, Namespace | `application` | `application-services` |
+| `database` | CloudNativePG, Namespace | `database` | `database-services` |
+| `monitoring` | Prometheus, Grafana, Namespace | `monitoring` | `monitoring-services` |
+| `observability` | OTEL, Jaeger, Tempo, Namespace | `observability` | `observability-services` |
+| `security` | cert-manager, Istio, Namespace | `security` | `security-services` |
+| `cicd` | ArgoCD, Namespace | `cicd` | `cicd-services` |
+| `backup` | Velero, Namespace | `backup` | `backup-services` |
+
+### Configurable Variables
+
+All modules expose tagging variables for customization:
+
+```hcl
+# Apply custom environment and owner tags
+terraform apply \
+  -var="environment=prod" \
+  -var="project_name=acme" \
+  -var="owner=devops-team" \
+  -var='common_tags={"cost-center":"engineering","team":"platform"}'
+```
+
+### Cost Management Integration
+
+**Tagging enables:**
+1. **Cost allocation**: Group expenses by `environment`, `project`, `owner`
+2. **Budget enforcement**: Set policies based on tags
+3. **Resource cleanup**: Identify and remove untagged resources
+4. **Compliance**: Ensure all resources meet tagging requirements
+
+**Example cost queries:**
+```bash
+# Cost by environment
+kubectl get all --all-namespaces -L environment
+
+# Cost by team
+kubectl get all --all-namespaces -L owner
+
+# Untagged resources (should be empty)
+kubectl get all --all-namespaces -L project | grep '<none>'
+```
+
+### Label Selectors for Operations
+
+Use labels to operate on resource groups:
+
+```bash
+# Scale all production application pods
+kubectl scale deployment -l environment=prod,project=acme
+
+# Delete all dev resources
+kubectl delete all -l environment=dev
+
+# Monitor staging resources
+kubectl get pods -l environment=staging --watch
+
+# Restart problematic pods by owner
+kubectl rollout restart deployment -l owner=platform
+```
 
 ---
 
