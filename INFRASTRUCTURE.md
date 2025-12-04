@@ -227,7 +227,6 @@ modules/
 - **cert-manager** automates certificate provisioning and renewal (when enabled)
 - **TLS Secret:** `acme-tls` (referenced in Ingress resource)
 - **Certificate Lifecycle:**
-  - Supports Let's Encrypt (staging and production)
   - Configurable via Ingress annotations: `cert-manager.io/cluster-issuer`
   - Default issuer: `letsencrypt-prod` (optional, when cert-manager enabled)
 - **Request Timeouts:**

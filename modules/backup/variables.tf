@@ -1,3 +1,30 @@
+# Tagging Variables
+variable "environment" {
+  description = "Environment name (dev, staging, prod)"
+  type        = string
+  default     = "dev"
+}
+
+variable "project_name" {
+  description = "Project name for resource tagging"
+  type        = string
+  default     = "acme"
+}
+
+variable "owner" {
+  description = "Owner/team responsible for resources"
+  type        = string
+  default     = "platform"
+}
+
+variable "common_tags" {
+  description = "Common tags to apply to all resources"
+  type        = map(string)
+  default = {
+    "managed-by" = "terraform"
+  }
+}
+
 variable "enable_backup" {
   description = "Enable Velero backup and disaster recovery"
   type        = bool

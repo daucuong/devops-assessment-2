@@ -1,7 +1,27 @@
+locals {
+  common_labels = merge(
+    var.common_tags,
+    {
+      "app.kubernetes.io/name"       = "acme-application"
+      "app.kubernetes.io/component"  = "application"
+      "app.kubernetes.io/managed-by" = "terraform"
+      "environment"                  = var.environment
+      "project"                      = var.project_name
+      "owner"                        = var.owner
+    }
+  )
+}
+
 resource "kubernetes_namespace" "app" {
   count = var.create_namespace ? 1 : 0
   metadata {
     name = var.app_namespace
+    labels = merge(
+      local.common_labels,
+      {
+        "namespace-purpose" = "application-services"
+      }
+    )
   }
 }
 
